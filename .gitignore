@@ -34,7 +34,9 @@ vignettes/*.pdf
 .Rproj.user
 
 # Data grids sourced from bom.gov.au
-data/*.grid
+data/**/*.grid
+# Solar energy logs
+data/**/*.csv
 
 # Configuration file
 config.yml

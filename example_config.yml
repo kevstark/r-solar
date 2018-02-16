@@ -1,0 +1,21 @@
+# Australian Government, Bureau of Meteorology 
+# - Climate Maps
+#   - Solar Exposure
+#     http://www.bom.gov.au/jsp/awap/solar/index.jsp
+#     http://www.bom.gov.au/climate/austmaps/metadata-daily-solar-exposure.shtml
+# 
+# Acknowledgements:
+#   Solar exposure data derived from satellite imagery processed by the Bureau of Meteorology 
+#   from the Geostationary Meteorological Satellite series operated by Japan Meteorological 
+#   Agency and from GOES-9 operated by the National Oceanographic & Atmospheric Administration 
+#   (NOAA) for the Japan Meteorological Agency.
+
+# Configuration and details of solar collection sites for comparison against BOM
+sites:
+  - label: "Brisbane, Queensland"
+    panel_wh: 1000
+    inv_wh: 1500
+    csv: "data/ecas/inverter_log.csv"
+    bom_stn: 040913 # Brisbane CBD
+    lat: -27.469771 
+    lon: 153.025124

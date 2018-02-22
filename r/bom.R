@@ -1,34 +1,104 @@
-x <- lubridate::ymd("20160223")
-download.bom_solargrid <- function(x = Sys.Date(), dst = file.path("data", "bom"), path_7za = file.path("7zip", "7za"), verbose = FALSE) {
-  if(verbose) message("download.bom_solargrid() ", format(x, "%Y%m%d"))
-  if(!dir.exists(dst)) dir.create(dst, recursive = TRUE)
-  grid_path <- file.path(dst, paste0(format(x, "%Y%m%d"), ".grid"))
-  if(verbose) message("  grid_path: ", grid_path)
+
+#' Downloads a grid from BOM and returns a \code{sp::SpatialGridDataFrame} object
+.downloadgrid.bom <- function(url, name, path_cache, path_7za, verbose = FALSE) {
+  if(verbose) message(".downloadgrid.bom() ", name)
+  # Create cache directory if missing
+  if(!dir.exists(path_cache)) dir.create(path_cache, recursive = TRUE)
+  # Define files paths for manipulation
+  grid_path <- file.path(path_cache, paste0(name, ".grid"))
+  grid_z_path <- file.path(path_cache, paste0(name, ".grid.z"))
+  
   if(!file.exists(grid_path)) {
-    url <- paste0("http://www.bom.gov.au/web03/ncc/www/awap/solar/solarave/daily/grid/0.05/history/nat/", format(x, "%Y%m%d%Y%m%d"), ".grid.Z")
-    download_path <- file.path(dst, paste0(format(x, "%Y%m%d"), ".grid.Z"))
-    if(verbose) message("  download_path: ", download_path)
-    
     # Download the file
-    download_log <- purrr::safely(download.file)(url = url, destfile = download_path, mode = "wb")
+    download_log <- purrr::safely(download.file)(url, destfile = grid_z_path, mode = "wb")
     # Check that the download completed successfully
     if(!is.null(download_log$error)) stop(download_log$error$message, call. = FALSE)
-    if(verbose) message("  downloaded: ", gdata::humanReadable(file.size(download_path)))
-    
     # Uncompress the downloaded grid
-    unzip_log <- processx::run(path_7za, c("e", "-y", paste0("-o", dst), download_path), echo = verbose)
-    if(unzip_log$status != 0) stop("Unzip command failed: ", unzip_log$stderr, call. = FALSE)
-    if(verbose) message("  unzipped: ", gdata::humanReadable(file.size(grid_path)))
-    
+    unzip_log <- processx::run(path_7za, c("e", "-y", paste0("-o", path_cache), grid_z_path), echo = verbose)
+    if(unzip_log$status != 0) stop("Unzip command failed: ", unzip_log$stderr, "\n", unzip_log$stdout, call. = FALSE)
     # Cleanup
-    file.remove(download_path)
+    file.remove(grid_z_path)
   }
-  if(verbose) message("  readGDAL()")
-  # Return unzipped files
-  rgdal::readGDAL(fname = grid_path)
+  return(grid_path)
 }
 
-download.bom_solarstn <- function(stn, dst = "data/bom", path_7za = "7zip/7za") {
+#' Query a grid for values as specific lat/lon coordinates
+.querygrid.bom <- function(x, loc, verbose = FALSE) {
+  if(is.na(x)) { return(rep(NA, nrow(loc))) }
+  grid <- rgdal::readGDAL(x, silent = !verbose)
+  values <- raster::extract(raster::raster(grid), data.frame(loc$lon, loc$lat))
+  return(values)
+}
+
+#' Calculate the location-specific solar exposure for specific days as published
+#' by bom.gov.au.
+#' 
+#' @param x A vector of \code{POSIXct} dates to calculate solar exposure.
+#' @param loc A single numeric pair of lat-lon values, or a \code{data.frame} 
+#'   with columns \code{lat} and \code{lon} for multiple locations.
+#' 
+#' @return A data.frame of calculated solar exposure for each location and date 
+#'   in both MJ and KWh units.
+#'   date | location | MJ | KWh
+#'   
+#' @export
+solarexposure.bom <- function(
+  x, 
+  loc,
+  path_cache = file.path(".cache-solar-bom.gov.au"), 
+  path_7za = file.path("7zip", "7za"),
+  url = "http://www.bom.gov.au/web03/ncc/www/awap/solar/solarave/daily/grid/0.05/history/nat/{yyyymmdd}{yyyymmdd}.grid.Z",
+  verbose = FALSE) 
+{
+  if(verbose) message("solarexposure.bom()")
+  # Validate loc values
+  if(inherits(loc, "data.frame")) {
+    if(!all(c("lat", "lon") %in% colnames(loc))) stop("Missing columns: expected numeric columns named 'lat' and 'lon'.")
+  } else if(inherits(loc, "numeric")) {
+    if(!all(c("lat", "lon") %in% names(loc))) stop("Missing names: expected numeric vector with named values 'lat' and 'lon'.")
+    # Convert to data.frame
+    loc <- data.frame(lat = loc["lat"], lon = loc["lon"])
+  } else { stop("Unhandled 'loc' of type '", class(loc), "'. Expected data.frame or numeric vector.", call. = FALSE) }
+  # Add row-names if not defined
+  if(is.null(rownames(loc))) { rownames(loc) <- paste0("location-", 1:nrow(loc)) }
+  # Convert date values to formatted strings
+  dates <- format(x, "%Y%m%d")
+  # Replace url placholders with date strings
+  urls <- stringr::str_replace_all(url, stringr::fixed("{yyyymmdd}"), dates)
+  # Download urls and return local paths
+  grid_paths <- purrr::map2(
+    urls, 
+    dates, 
+    function(url, date, path_cache, path_7za, verbose) {
+      download <- purrr::safely(.downloadgrid.bom)(url, date, path_cache, path_7za, verbose)
+      if(!is.null(download$error)) {
+        warning(".downloadgrid.bom() Failed to download grid at date: ", date, "\n", download$error, noBreaks. = FALSE, call. = FALSE)
+        return(as.character(NA))
+      }
+      return(download$result)
+    }, 
+    path_cache = path_cache, 
+    path_7za = path_7za, 
+    verbose = verbose
+  )
+
+  # Load grids and extract values at coordinates
+  values <- purrr::map(
+    grid_paths,
+    .querygrid.bom, 
+    loc = loc,
+    verbose = verbose
+  )
+  # Add location names and convert units
+  values <- purrr::map2(dates, values, function(date, vals, names) { data.frame(date = date, loc = names, MJ_m2 = vals, KWh_m2 = vals * 0.2777778, stringsAsFactors = FALSE) }, names = rownames(loc))
+  names(values) <- dates
+  # Merge results and return with date columns
+  result <- dplyr::bind_rows(values)
+  return(result)
+}
+
+
+.download.bom_solarstn <- function(stn, dst = "data/bom", path_7za = "7zip/7za") {
   if(!dir.exists(dst)) dir.create(dst, recursive = TRUE)
   # Append the station number to the URL
   url <- paste0("http://www.bom.gov.au/jsp/ncc/cdio/weatherData/av?p_nccObsCode=193&p_display_type=dailyDataFile&p_startYear=&p_c=&p_stn_num=", stn)

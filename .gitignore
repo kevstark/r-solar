@@ -33,12 +33,10 @@ vignettes/*.pdf
 *.knit.md
 .Rproj.user
 
-# Data grids sourced from bom.gov.au
-data/**/*.grid
-data/**/*.Z
 # Solar energy logs
 data/**/*.csv
 
 # Configuration file
 config.yml
 *.grid
+.cache*

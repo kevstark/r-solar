@@ -23,10 +23,13 @@
 }
 
 #' Query a grid for values as specific lat/lon coordinates
-.querygrid.bom <- function(x, loc, verbose = FALSE) {
-  if(is.na(x)) { return(rep(NA, nrow(loc))) }
+.querygrid.bom <- function(x, lat, lon, verbose = FALSE) {
+  if(length(lat) != length(lon)) stop("Mismatched number of lat-lon values", call. = FALSE)
+  if(length(lat) == 0) stop("Missing lat-lon values", call. = FALSE)
+  
+  if(is.na(x)) { return(rep(NA, length(lat))) }
   grid <- rgdal::readGDAL(x, silent = !verbose)
-  values <- raster::extract(raster::raster(grid), data.frame(loc$lon, loc$lat))
+  values <- raster::extract(raster::raster(grid), data.frame(lon, lat))
   return(values)
 }
 
@@ -34,37 +37,47 @@
 #' by bom.gov.au.
 #' 
 #' @param x A vector of \code{POSIXct} dates to calculate solar exposure.
-#' @param loc A single numeric pair of lat-lon values, or a \code{data.frame} 
-#'   with columns \code{lat} and \code{lon} for multiple locations.
+#' @param lat A numeric vector of latitude values in the range +-90.0
+#' @param lon A numeric vector of longitude values in the range +-180.0
+#' @param label A character vector of names for each lat-lon pair
+#' @param path_cache Relative path to directory to store/read cached grid files
+#' @param path_7za Relative path to 7za binary 
+#' @param url Template URL path for download
+#' @param verbose Flag for additional debugging/progress info
 #' 
 #' @return A data.frame of calculated solar exposure for each location and date 
 #'   in both MJ and KWh units.
 #'   date | location | MJ | KWh
 #'   
 #' @export
+
 solarexposure.bom <- function(
   x, 
-  loc,
+  lat, lon, label = NULL,
   path_cache = file.path(".cache-solar-bom.gov.au"), 
   path_7za = file.path("7zip", "7za"),
   url = "http://www.bom.gov.au/web03/ncc/www/awap/solar/solarave/daily/grid/0.05/history/nat/{yyyymmdd}{yyyymmdd}.grid.Z",
   verbose = FALSE) 
 {
   if(verbose) message("solarexposure.bom()")
-  # Validate loc values
-  if(inherits(loc, "data.frame")) {
-    if(!all(c("lat", "lon") %in% colnames(loc))) stop("Missing columns: expected numeric columns named 'lat' and 'lon'.")
-  } else if(inherits(loc, "numeric")) {
-    if(!all(c("lat", "lon") %in% names(loc))) stop("Missing names: expected numeric vector with named values 'lat' and 'lon'.")
-    # Convert to data.frame
-    loc <- data.frame(lat = loc["lat"], lon = loc["lon"])
-  } else { stop("Unhandled 'loc' of type '", class(loc), "'. Expected data.frame or numeric vector.", call. = FALSE) }
-  # Add row-names if not defined
-  if(is.null(rownames(loc))) { rownames(loc) <- paste0("location-", 1:nrow(loc)) }
+  # Validate location
+  if(length(lat) != length(lon)) stop("Mismatched number of lat-lon values", call. = FALSE)
+  if(length(lat) == 0) stop("Missing lat-lon values", call. = FALSE)
+  
+  # Validate labels
+  if(!is.null(label)) { 
+    if(length(label) != length(lat)) stop("Mismatched number of labels for locations", call. = FALSE) 
+  } else { 
+    # Generate labels as sequential number
+    label <- paste0("location-", 1:length(lat))
+  }
+  
   # Convert date values to formatted strings
   dates <- format(x, "%Y%m%d")
+  
   # Replace url placholders with date strings
   urls <- stringr::str_replace_all(url, stringr::fixed("{yyyymmdd}"), dates)
+  
   # Download urls and return local paths
   grid_paths <- purrr::map2(
     urls, 
@@ -86,11 +99,12 @@ solarexposure.bom <- function(
   values <- purrr::map(
     grid_paths,
     .querygrid.bom, 
-    loc = loc,
+    lat = lat,
+    lon = lon,
     verbose = verbose
   )
   # Add location names and convert units
-  values <- purrr::map2(dates, values, function(date, vals, names) { data.frame(date = date, loc = names, MJ_m2 = vals, KWh_m2 = vals * 0.2777778, stringsAsFactors = FALSE) }, names = rownames(loc))
+  values <- purrr::map2(dates, values, function(date, vals, names, lat, lon) { data.frame(date = date, label = names, lat = lat, lon = lon, MJ_m2 = vals, KWh_m2 = vals * 0.2777778, stringsAsFactors = FALSE) }, names = label, lat = lat, lon = lon)
   names(values) <- dates
   # Merge results and return with date columns
   result <- dplyr::bind_rows(values)

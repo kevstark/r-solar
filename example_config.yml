@@ -13,9 +13,9 @@
 # Configuration and details of solar collection sites for comparison against BOM
 sites:
   - label: "Brisbane, Queensland"
-    panel_wh: 1000
-    inv_wh: 1500
+    panel_m2: 1
+    panel_wh: 200
+    inv_wh: 1000
     csv: "data/ecas/inverter_log.csv"
-    bom_stn: 040913 # Brisbane CBD
     lat: -27.469771 
     lon: 153.025124

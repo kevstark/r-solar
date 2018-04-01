@@ -19,3 +19,4 @@ sites:
     csv: "data/ecas/inverter_log.csv"
     lat: -27.469771 
     lon: 153.025124
+    tz: Australia/Brisbane

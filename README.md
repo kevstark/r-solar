@@ -19,6 +19,6 @@ Source: http://www.bom.gov.au/jsp/awap/solar/index.jsp
 
 Total solar exposure is measured as potential energy falling on a square meter of ground in a flat orientation over the period of a day (solar cycle). The units are Megajoules per square meter (MJ/m<sup>2</sup>).
 
-Residential panels typically peak around the ~14% efficiency rating, and inverters in the 85-95% range depending on their temperature and input amperages. Inclination and orientation of the panels further reduce the  
+Residential panels typically peak around the ~14% efficiency rating, and inverters in the 85-95% range depending on their temperature and input amperage. Inclination and orientation of the panels further reduce the potential energy generated.
 
 

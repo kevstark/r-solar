@@ -50,7 +50,6 @@
 #'   date | location | MJ | KWh
 #'   
 #' @export
-
 solarexposure.bom <- function(
   x, 
   lat, lon, label = NULL,

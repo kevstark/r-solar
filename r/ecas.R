@@ -92,7 +92,7 @@ interpolate_solar.ecas <- function(x, at, lat, lon, verbose = FALSE) {
       0, ifelse(is.na(suntimes_at$x_at_h), 0, (suntimes_at$x_at_h / suntimes_at$daylight_hrs)), 
       ~ stats::integrate(solar_f, lower = .x, upper = .y)$value)
     )
-                  
+
   # Total solar hours up to 'at'
   suntimes_at %<>%
     dplyr::mutate(cuml_solar_hrs = cumsum(solar_hrs)) %>%

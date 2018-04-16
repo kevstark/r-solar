@@ -21,6 +21,8 @@ Total solar exposure is measured as potential energy falling on a square meter o
 
 Residential panels typically peak around the ~14% efficiency rating, and inverters in the 85-95% range depending on their temperature and input amperage. Inclination and orientation of the panels further reduce the potential energy generated.
 
+A total energy conversion percentage of 8-12% is expected for residential systems. Efficency will be higher in the cooler seasons, even though less total energy is available.
+
 ## Data
 
 This analysis utilises the following data sources:
@@ -29,6 +31,8 @@ This analysis utilises the following data sources:
 This may be a manual or automated log, and does not need to be daily readings however more frequent readings increase the accuracy of the comparisons. [ECAS](https://play.google.com/store/apps/details?id=at.topfen.ecas) has been used as a mobile-friendly manual data logging application in this example.
 
 ## Method
+
+
 
 ## Results
 
